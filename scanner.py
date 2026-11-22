@@ -67,7 +67,6 @@ hk_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%
 with open("last_update.txt", "w") as f:
     f.write(hk_time)
 
-# 生成適合手機瀏覽嘅純網頁 index.html
 table_html = out_df.to_html(index=False, border=0, classes="stock-table") if not out_df.empty else "<p class='empty'>今日暫時未有港股通股票符合條件。</p>"
 
 html_content = f"""<!DOCTYPE html>
