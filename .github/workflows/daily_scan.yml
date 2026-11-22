@@ -1,0 +1,36 @@
+name: 每日港股通 MA+大成交掃描
+
+on:
+  schedule:
+    # 逢星期一至五 UTC 08:15 (即香港時間 16:15 收市後) 自動執行
+    - cron: '15 8 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下載專案檔案
+        uses: actions/checkout@v4
+
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝套件
+        run: pip install -r requirements.txt
+
+      - name: 執行港股通選股掃描
+        run: python scanner.py
+
+      - name: 自動儲存最新結果到 GitHub
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add results.csv last_update.txt
+          git commit -m "更新每日港股通選股結果" || exit 0
+          git push
