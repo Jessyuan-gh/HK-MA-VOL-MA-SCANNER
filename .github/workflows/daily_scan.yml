@@ -31,6 +31,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add results.csv last_update.txt
+          git add results.csv last_update.txt index.html
           git commit -m "更新每日港股通選股結果" || exit 0
           git push
