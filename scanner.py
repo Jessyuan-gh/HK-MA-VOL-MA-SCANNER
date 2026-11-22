@@ -5,9 +5,7 @@ import datetime
 
 print("正在獲取最新港股通成份股名單...")
 try:
-    # 自動從東方財富/港股通接口獲取最新港股通股票代碼及名稱
     ggt_df = ak.stock_hk_ggt_components_em()
-    # 轉換代號格式為 Yahoo Finance 適用格式 (例如 "00700" -> "0700.HK")
     code_to_name = {}
     tickers = []
     for _, row in ggt_df.iterrows():
@@ -22,7 +20,6 @@ except Exception as e:
     tickers = list(code_to_name.keys())
 
 print("正在批量下載歷史數據並計算指標...")
-# 一次過批量下載所有港股通過去 3 個月數據（速度極快）
 data = yf.download(tickers, period="3mo", interval="1d", group_by="ticker", threads=True, progress=False)
 
 results = []
@@ -33,20 +30,16 @@ for ticker in tickers:
         if len(df) < 50:
             continue
 
-        # 計算均線與成交量均線
         df['MA20'] = df['Close'].rolling(window=20).mean()
         df['MA50'] = df['Close'].rolling(window=50).mean()
         df['VOL_MA20'] = df['Volume'].rolling(window=20).mean()
 
         today = df.iloc[-1]
-        
-        # 避免成交量為 0 導致除零錯誤
         if today['VOL_MA20'] <= 0:
             continue
             
         vol_ratio = today['Volume'] / today['VOL_MA20']
 
-        # 篩選條件：收市價企穩 MA20 & MA50 + 陽燭 + 成交量 >= 1.5倍 20日均量
         if (today['Close'] > today['MA20'] and 
             today['Close'] > today['MA50'] and 
             today['Close'] > today['Open'] and 
@@ -63,7 +56,6 @@ for ticker in tickers:
     except Exception:
         continue
 
-# 儲存結果並按「成交量倍數」由大至小排序
 out_df = pd.DataFrame(results)
 if not out_df.empty:
     out_df = out_df.sort_values(by="成交量倍數", ascending=False)
@@ -71,9 +63,48 @@ if not out_df.empty:
 
 out_df.to_csv("results.csv", index=False, encoding="utf-8-sig")
 
-# 記錄香港更新時間
 hk_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
 with open("last_update.txt", "w") as f:
     f.write(hk_time)
 
-print(f"港股通掃描完成！共篩選出 {len(results)} 隻符合條件股票。")
+# 生成適合手機瀏覽嘅純網頁 index.html
+table_html = out_df.to_html(index=False, border=0, classes="stock-table") if not out_df.empty else "<p class='empty'>今日暫時未有港股通股票符合條件。</p>"
+
+html_content = f"""<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>港股通 MA + 大成交訊號</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 16px; background: #f8f9fa; color: #212529; }}
+  .container {{ max-width: 680px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }}
+  h1 {{ font-size: 22px; margin: 0 0 8px 0; }}
+  .time {{ font-size: 13px; color: #6c757d; margin-bottom: 16px; }}
+  .metric {{ background: #eef4ff; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }}
+  .metric-label {{ font-size: 13px; color: #495057; }}
+  .metric-val {{ font-size: 28px; font-weight: bold; color: #0d6efd; }}
+  .table-wrap {{ overflow-x: auto; }}
+  .stock-table {{ width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }}
+  .stock-table th {{ background: #f1f3f5; padding: 10px 8px; border-bottom: 2px solid #dee2e6; white-space: nowrap; }}
+  .stock-table td {{ padding: 10px 8px; border-bottom: 1px solid #eee; white-space: nowrap; }}
+  .empty {{ color: #6c757d; padding: 20px 0; text-align: center; }}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📈 港股通 MA + 大成交訊號</h1>
+  <div class="time">最後更新時間 (HKT)：{hk_time}（每日 16:15 自動更新）</div>
+  <div class="metric">
+    <div class="metric-label">今日符合條件股票數量</div>
+    <div class="metric-val">{len(out_df)}</div>
+  </div>
+  <div class="table-wrap">{table_html}</div>
+</div>
+</body>
+</html>"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print(f"港股通掃描及網頁生成完成！共 {len(results)} 隻。")
